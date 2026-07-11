@@ -201,7 +201,7 @@ export function TextWorkbench({ projectId }: { projectId: string }) {
         },
       );
       setSegments(result.segments);
-      setNotice(`AI mock 分析完成，已產生 ${result.segments.length} 個劇情片段。`);
+      setNotice(`文本分析完成，已產生 ${result.segments.length} 個劇情片段。`);
       await loadWorkspace();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "分析失敗");
@@ -276,7 +276,7 @@ export function TextWorkbench({ projectId }: { projectId: string }) {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">文本工作台</h1>
         <p className="mt-2 text-muted-foreground">
-          貼上或上傳故事原稿，使用 mock AI 分析故事結構並拆成可確認的劇情片段。
+          貼上或上傳故事原稿，系統會分析故事結構並拆成可確認的劇情片段。
         </p>
       </div>
       <WorkflowStepper status={workspace?.project.status ?? "draft"} current="text" projectId={projectId} />
@@ -299,7 +299,7 @@ export function TextWorkbench({ projectId }: { projectId: string }) {
             <CardHeader>
               <CardTitle>原稿輸入</CardTitle>
               <CardDescription>
-                .txt / .md 會直接解析；.docx / .pdf 先建立上傳紀錄與 placeholder parsing。
+                .txt / .md 會直接解析；.docx / .pdf 會先建立上傳紀錄，之後可接正式解析器。
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -332,7 +332,7 @@ export function TextWorkbench({ projectId }: { projectId: string }) {
           <Card className="bg-card/80 backdrop-blur">
             <CardHeader>
               <CardTitle>專案設定</CardTitle>
-              <CardDescription>這些欄位會傳入 mock `analyzeStory(input)`。</CardDescription>
+              <CardDescription>這些欄位會影響文本分析、分段與後續提示詞。</CardDescription>
             </CardHeader>
             <CardContent>
               <FieldGroup>

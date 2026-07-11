@@ -20,7 +20,7 @@ export async function POST(
     const parsedText =
       input.fileType === "txt" || input.fileType === "md"
         ? input.rawText?.trim() ?? ""
-        : "完整解析器之後串接；目前僅建立上傳紀錄與 placeholder parsing。";
+        : "完整解析器之後串接；目前先建立上傳紀錄。";
 
     if ((input.fileType === "txt" || input.fileType === "md") && !parsedText) {
       return NextResponse.json({ error: "文字檔內容為空，請重新上傳或貼上原稿。" }, { status: 400 });

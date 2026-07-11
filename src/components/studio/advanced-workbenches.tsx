@@ -408,8 +408,8 @@ export function TransitionsWorkbench({ projectId }: { projectId: string }) {
               <Button variant="outline" disabled={!transitionDrafts || isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/transitions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save", transitions: displayedTransitions }) }), "轉場 prompt / 模型設定已保存。")}>
                 保存轉場設定
               </Button>
-              <Button variant="outline" disabled={!selectedIds.length || isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/transitions/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transitionIds: selectedIds }) }), "已 mock 生成選取轉場影片。")}>生成選取轉場</Button>
-              <Button variant="outline" disabled={isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/transitions/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ allPending: true }) }), "已 mock 生成全部 pending 轉場。")}>生成全部 pending</Button>
+              <Button variant="outline" disabled={!selectedIds.length || isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/transitions/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ transitionIds: selectedIds }) }), "已生成選取轉場影片紀錄。")}>生成選取轉場</Button>
+              <Button variant="outline" disabled={isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/transitions/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ allPending: true }) }), "已生成全部等待中的轉場紀錄。")}>生成全部待處理轉場</Button>
             </div>
             <div className="grid gap-3">
               {displayedTransitions.map((transition) => {
@@ -446,7 +446,7 @@ export function TransitionsWorkbench({ projectId }: { projectId: string }) {
                     ) : (
                       <p className="mt-3 text-sm text-muted-foreground">{transition.transitionPromptEn}</p>
                     )}
-                    <p className="mt-2 text-xs text-muted-foreground">{transition.videoModel} · {transition.durationSeconds}s · {asset?.filename ?? "no approved clip"}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{transition.videoModel} · {transition.durationSeconds}s · {asset?.filename ?? "尚無已確認片段"}</p>
                   </div>
                 );
               })}
@@ -481,21 +481,28 @@ export function GalleryWorkbench({ projectId }: { projectId: string }) {
     .filter((item) => !galleryQuery || JSON.stringify(item).toLowerCase().includes(galleryQuery.toLowerCase()));
 
   return (
-    <WorkbenchFrame projectId={projectId} title="Gallery 素材庫" description="集中管理 reference images、generated images、videos、transition videos 與 exports。" current="gallery" workspace={workspace} error={error} notice={notice}>
+    <WorkbenchFrame projectId={projectId} title="素材庫" description="集中管理參考圖、生成圖片、影片、轉場影片與匯出檔案。" current="gallery" workspace={workspace} error={error} notice={notice}>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card>
           <CardHeader>
             <CardTitle>素材瀑布流</CardTitle>
-            <CardDescription>依 type / favorite / tag / model 篩選，查看 prompt snapshot。</CardDescription>
+            <CardDescription>依類型、收藏、標籤與模型篩選，查看素材來源與提示詞摘要。</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
-              {["all", "image", "video", "reference", "export", "favorite"].map((item) => (
-                <Button key={item} variant={filter === item ? "secondary" : "outline"} onClick={() => setFilter(item)}>{item}</Button>
+              {[
+                ["all", "全部"],
+                ["image", "圖片"],
+                ["video", "影片"],
+                ["reference", "參考圖"],
+                ["export", "匯出"],
+                ["favorite", "收藏"],
+              ].map(([value, label]) => (
+                <Button key={value} variant={filter === value ? "secondary" : "outline"} onClick={() => setFilter(value)}>{label}</Button>
               ))}
               <Button disabled={isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/gallery`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "sync" }) }), "Gallery index 已同步。")}>同步素材庫</Button>
             </div>
-            <Input placeholder="搜尋 shot / character / environment / model / approved / favorite / tag / prompt" value={galleryQuery} onChange={(event) => setGalleryQuery(event.target.value)} />
+            <Input placeholder="搜尋分鏡、角色、場景、模型、狀態、標籤或提示詞" value={galleryQuery} onChange={(event) => setGalleryQuery(event.target.value)} />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {rows.map((item) => {
                 const asset = assets.find((candidate) => candidate.id === item.assetId);
@@ -507,11 +514,11 @@ export function GalleryWorkbench({ projectId }: { projectId: string }) {
                       <CardAction><StatusBadge status={item.status || "pending"} /></CardAction>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-3">
-                      {asset?.url && asset.type === "generated_image" ? <img src={asset.url} alt={asset.filename} className="rounded-xl border" /> : <div className="rounded-xl border bg-white/50 p-5 text-sm text-muted-foreground">{asset?.promptSnapshot?.slice(0, 160) || "No prompt snapshot"}</div>}
+                      {asset?.url && asset.type === "generated_image" ? <img src={asset.url} alt={asset.filename} className="rounded-xl border" /> : <div className="rounded-xl border bg-white/50 p-5 text-sm text-muted-foreground">{asset?.promptSnapshot?.slice(0, 160) || "尚無提示詞摘要"}</div>}
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => run(() => fetchJson(`/api/projects/${projectId}/gallery`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "favorite", galleryItemId: item.id, favorite: !item.favorite }) }), item.favorite ? "已取消收藏。" : "已加入收藏。")}>
                           <StarIcon data-icon="inline-start" aria-hidden="true" />
-                          Favorite
+                          {item.favorite ? "取消收藏" : "加入收藏"}
                         </Button>
                         {asset ? <Button size="sm" variant="outline" onClick={() => downloadBlob(asset.filename, JSON.stringify(asset, null, 2), "application/json;charset=utf-8")}>下載</Button> : null}
                       </div>
@@ -523,9 +530,9 @@ export function GalleryWorkbench({ projectId }: { projectId: string }) {
           </CardContent>
         </Card>
         <aside className="flex flex-col gap-4">
-          <StatCard title="Gallery Items" value={String(gallery.length)} description="synced from assets" icon={GalleryHorizontalEndIcon} />
-          <StatCard title="Favorites" value={String(gallery.filter((item) => item.favorite).length)} description="best assets" icon={StarIcon} />
-          <Button variant="outline" disabled={!assets.length} onClick={() => downloadZip(`${slugify(workspace!.project.name)}_gallery_${timeStamp()}.zip`, assetDownloadFiles(assets, "gallery"))}>下載 Gallery ZIP</Button>
+          <StatCard title="素材數" value={String(gallery.length)} description="由任務素材同步" icon={GalleryHorizontalEndIcon} />
+          <StatCard title="收藏數" value={String(gallery.filter((item) => item.favorite).length)} description="手動標記的素材" icon={StarIcon} />
+          <Button variant="outline" disabled={!assets.length} onClick={() => downloadZip(`${slugify(workspace!.project.name)}_gallery_${timeStamp()}.zip`, assetDownloadFiles(assets, "gallery"))}>下載素材 ZIP</Button>
         </aside>
       </div>
     </WorkbenchFrame>
@@ -556,15 +563,15 @@ export function LogsDashboardWorkbench({ projectId }: { projectId: string }) {
   const stages = ["all", ...Array.from(new Set(logs.map((log) => log.stage)))];
 
   return (
-    <WorkbenchFrame projectId={projectId} title="Logs Dashboard" description="追蹤 story/script/shot/image/video/transition/export/API error/model fallback logs。" current="logs" workspace={workspace} error={error} notice={notice}>
+    <WorkbenchFrame projectId={projectId} title="操作紀錄" description="追蹤文本、腳本、分鏡、圖片、影片、轉場、匯出、API 錯誤與模型切換紀錄。" current="logs" workspace={workspace} error={error} notice={notice}>
       <Card>
         <CardHeader>
-          <CardTitle>Logs</CardTitle>
+          <CardTitle>紀錄</CardTitle>
           <CardDescription>支援搜尋、篩選、匯出 CSV/XLSX 與清除。</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="grid gap-3 md:grid-cols-[1fr_16rem_auto_auto_auto]">
-            <Input placeholder="搜尋 action/model/error..." value={query} onChange={(event) => setQuery(event.target.value)} />
+            <Input placeholder="搜尋動作、模型或錯誤..." value={query} onChange={(event) => setQuery(event.target.value)} />
             <select className="h-9 rounded-lg border bg-background px-3 text-sm" value={stage} onChange={(event) => setStage(event.target.value)}>
               {stages.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
@@ -573,13 +580,13 @@ export function LogsDashboardWorkbench({ projectId }: { projectId: string }) {
             <Button variant="outline" disabled={isBusy || !logs.length} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/logs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "clear" }) }), "Logs 已清除。")}>清除 logs</Button>
           </div>
           <DataTable rows={rows} columns={[
-            { key: "time", header: "time" },
-            { key: "stage", header: "stage" },
-            { key: "action", header: "action" },
-            { key: "model", header: "model" },
-            { key: "status", header: "status" },
-            { key: "cost", header: "cost" },
-            { key: "duration", header: "duration" },
+            { key: "time", header: "時間" },
+            { key: "stage", header: "階段" },
+            { key: "action", header: "動作" },
+            { key: "model", header: "模型" },
+            { key: "status", header: "狀態" },
+            { key: "cost", header: "費用" },
+            { key: "duration", header: "耗時" },
           ]} />
         </CardContent>
       </Card>
@@ -630,18 +637,18 @@ export function TimelineEditorWorkbench({ projectId }: { projectId: string }) {
   }
 
   return (
-    <WorkbenchFrame projectId={projectId} title="Timeline Editor 初版" description="依 shot order 自動排列影片與轉場，支援簡易排序、start/end、mock FFmpeg 合併。" current="timeline" workspace={workspace} error={error} notice={notice}>
+    <WorkbenchFrame projectId={projectId} title="時間軸編輯" description="依分鏡順序排列影片與轉場，支援簡易排序、起訖時間與合併輸出紀錄。" current="timeline" workspace={workspace} error={error} notice={notice}>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <Card>
           <CardHeader>
-            <CardTitle>Tracks</CardTitle>
-            <CardDescription>video / transition / audio placeholder / subtitle placeholder</CardDescription>
+            <CardTitle>軌道</CardTitle>
+            <CardDescription>影片、轉場、音訊與字幕軌道。</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">
-              <Button disabled={isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/timeline`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto-build" }) }), "Timeline 已依 shot order 自動排列。")}>自動排列</Button>
-              <Button variant="outline" disabled={!currentTimeline || isBusy} onClick={() => run(saveTimeline, "Timeline 已保存。")}>保存排序</Button>
-              <Button variant="outline" disabled={!currentTimeline || isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/timeline`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "mock-export" }) }), "已 mock 合併並輸出 final video placeholder。")}>Mock FFmpeg 合併</Button>
+              <Button disabled={isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/timeline`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "auto-build" }) }), "時間軸已依分鏡順序自動排列。")}>自動排列</Button>
+              <Button variant="outline" disabled={!currentTimeline || isBusy} onClick={() => run(saveTimeline, "時間軸已保存。")}>保存排序</Button>
+              <Button variant="outline" disabled={!currentTimeline || isBusy} onClick={() => run(() => fetchJson(`/api/projects/${projectId}/timeline`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "mock-export" }) }), "已建立合併輸出紀錄。")}>建立合併輸出紀錄</Button>
             </div>
             {(currentTimeline?.tracks ?? []).map((track: TimelineTrack) => (
               <div key={track.id} className="rounded-2xl border bg-white/55 p-4">
@@ -666,12 +673,12 @@ export function TimelineEditorWorkbench({ projectId }: { projectId: string }) {
           </CardContent>
         </Card>
         <aside className="flex flex-col gap-4">
-          <StatCard title="Duration" value={`${currentTimeline?.durationSeconds ?? 0}s`} description="mock sequence length" icon={LayersIcon} />
-          <StatCard title="Export Status" value={currentTimeline?.exportStatus ?? "draft"} description="FFmpeg adapter placeholder" icon={DownloadIcon} />
+          <StatCard title="總長度" value={`${currentTimeline?.durationSeconds ?? 0}s`} description="依目前時間軸計算" icon={LayersIcon} />
+          <StatCard title="匯出狀態" value={currentTimeline?.exportStatus ?? "draft"} description="目前輸出紀錄狀態" icon={DownloadIcon} />
           <Card>
-            <CardHeader><CardTitle>Preview Placeholder</CardTitle></CardHeader>
+            <CardHeader><CardTitle>時間軸摘要</CardTitle></CardHeader>
             <CardContent className="rounded-2xl border bg-white/55 p-5 text-sm text-muted-foreground">
-              這裡會依 tracks 順序播放 approved videos 與 transition clips。MVP 先顯示序列資料，後續接真正 video preview。
+              這裡依軌道順序整理已確認影片與轉場片段。若尚未接上播放器，僅顯示序列資料與輸出狀態。
             </CardContent>
           </Card>
         </aside>
@@ -722,16 +729,16 @@ export function ModelSettingsWorkbench() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Model Settings / BYOK</h1>
-        <p className="mt-2 text-muted-foreground">管理 OpenAI、Gemini、Vertex AI、xAI、ComfyUI endpoint；API key 僅保存遮罩值。</p>
+        <h1 className="text-3xl font-semibold tracking-tight">API 與模型設定</h1>
+        <p className="mt-2 text-muted-foreground">管理 OpenAI、Gemini、Vertex AI、xAI 與本機 ComfyUI 端點；這裡只保存遮罩後的金鑰欄位。</p>
       </div>
       {error ? <Alert variant="destructive"><AlertTitle>錯誤</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
       {notice ? <Alert><CheckIcon aria-hidden="true" /><AlertTitle>狀態更新</AlertTitle><AlertDescription>{notice}</AlertDescription></Alert> : null}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
         <Card>
           <CardHeader>
-            <CardTitle>Provider Keys</CardTitle>
-            <CardDescription>正式版請改安全後端儲存；MVP 使用 local encrypted mock storage 欄位。</CardDescription>
+            <CardTitle>API 金鑰與端點</CardTitle>
+            <CardDescription>請填入服務商金鑰或本機端點。此工具不需要登入、註冊或積分設定。</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {settings.map((setting, index) => (
@@ -744,27 +751,27 @@ export function ModelSettingsWorkbench() {
                 />
                 <label className="flex items-center gap-2 text-sm">
                   <input className="sky-checkbox" type="checkbox" checked={setting.enabled} onChange={(event) => setSettings((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, enabled: event.target.checked } : item))} />
-                  enabled
+                  啟用
                 </label>
                 <Input type="number" value={setting.priority} onChange={(event) => setSettings((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, priority: Number(event.target.value) } : item))} />
-                <Button variant="outline" disabled={isBusy} onClick={() => run(() => fetchJson("/api/settings/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "test", provider: setting.provider }) }), `${setting.provider} mock connection passed。`)}>
-                  Test
+                <Button variant="outline" disabled={isBusy} onClick={() => run(() => fetchJson("/api/settings/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "test", provider: setting.provider }) }), `${setting.provider} 連線測試完成。`)}>
+                  測試
                 </Button>
               </div>
             ))}
-            <Button disabled={isBusy} onClick={() => run(() => fetchJson("/api/settings/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save", settings }) }), "Provider 設定已保存。")}>
+            <Button disabled={isBusy} onClick={() => run(() => fetchJson("/api/settings/models", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "save", settings }) }), "API 設定已保存。")}>
               <KeyRoundIcon data-icon="inline-start" aria-hidden="true" />
               保存模型設定
             </Button>
           </CardContent>
         </Card>
         <aside className="flex flex-col gap-4">
-          <StatCard title="Image Models" value={String(modelCapabilities.imageModels.length)} description="from model-capabilities.json" icon={SparklesIcon} />
-          <StatCard title="Video Models" value={String(modelCapabilities.videoModels.length)} description="fallbackModelIds enabled" icon={WaypointsIcon} />
+          <StatCard title="圖片模型" value={String(modelCapabilities.imageModels.length)} description="目前可選圖片模型" icon={SparklesIcon} />
+          <StatCard title="影片模型" value={String(modelCapabilities.videoModels.length)} description="目前可選影片模型" icon={WaypointsIcon} />
           <Card>
-            <CardHeader><CardTitle>Fallback Preview</CardTitle></CardHeader>
+            <CardHeader><CardTitle>模型切換規則</CardTitle></CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Veo 3.1 Fast failed → retry once → fallback to local_mock_video。所有 fallback 會寫入 Logs Dashboard。
+              當主要模型失敗時，系統會重試一次，再依設定切換到備援模型。所有切換都會寫入操作紀錄。
             </CardContent>
           </Card>
         </aside>

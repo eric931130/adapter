@@ -55,7 +55,7 @@ export async function POST(request: Request, context: { params: Promise<{ projec
           action: "mock_ffmpeg_merge",
           model: "mock-ffmpeg-adapter",
           inputSummary: "approved videos + transition clips",
-          outputSummary: "final_video_placeholder.mp4",
+          outputSummary: "final_video_export_record.mp4",
           status: "success",
           cost: 0,
           durationMs: 600,

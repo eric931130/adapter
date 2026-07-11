@@ -22,8 +22,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dreamy Sky Creator Console",
-  description: "AI story-to-video creator console for scripts, assets, images, and render queues.",
+  title: "影片生成工具",
+  description: "繁體中文影片生成工作台，支援文本、分鏡、API 用量與即時費用紀錄。",
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",

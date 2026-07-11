@@ -36,7 +36,7 @@ import type { ProjectWorkspace } from "@/lib/workspace-types";
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error ?? "請求失敗");
+  if (!response.ok) throw new Error(payload.error?.userMessage ?? payload.error ?? "操作失敗。");
   return payload as T;
 }
 
@@ -70,7 +70,7 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
       })
       .catch((caught) => {
         if (cancelled) return;
-        setError(caught instanceof Error ? caught.message : "讀取匯出中心失敗");
+        setError(caught instanceof Error ? caught.message : "讀取匯出資料失敗。");
       });
     return () => {
       cancelled = true;
@@ -112,6 +112,11 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
   const galleryRows = (workspace?.galleryItems ?? []).map((item) => ({ ...item, tags: item.tags.join(", "), linkedShotIds: item.linkedShotIds.join(", ") }));
   const transitionRows = (workspace?.transitions ?? []).map((transition) => ({ ...transition }));
   const logRows = (workspace?.studioLogs ?? []).map((log) => ({ ...log }));
+  const approvedImages = assets.filter((asset) => asset.type === "generated_image" && asset.status === "approved");
+  const allImages = assets.filter((asset) => asset.type === "generated_image");
+  const approvedVideos = assets.filter((asset) => asset.type === "generated_video" && asset.status === "approved");
+  const allVideos = assets.filter((asset) => asset.type === "generated_video");
+
   const costSummary = useMemo(() => {
     const imageJobs = jobs.filter((job) => job.type === "image");
     const videoJobs = jobs.filter((job) => job.type === "video");
@@ -129,6 +134,7 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
       averageVideoCost: videoJobs.length ? videoCost / videoJobs.length : 0,
     };
   }, [jobs]);
+
   const costRows = generationJobRows.map((row) => ({
     job_id: row.job_id,
     project_id: projectId,
@@ -145,10 +151,6 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
     completed_at: row.completed_at,
     error_message: row.error_message,
   }));
-  const approvedImages = assets.filter((asset) => asset.type === "generated_image" && asset.status === "approved");
-  const allImages = assets.filter((asset) => asset.type === "generated_image");
-  const approvedVideos = assets.filter((asset) => asset.type === "generated_video" && asset.status === "approved");
-  const allVideos = assets.filter((asset) => asset.type === "generated_video");
 
   async function recordExport(exportType: string, extension: string) {
     if (!project) return;
@@ -160,10 +162,10 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exportType, extension }),
       });
-      setNotice(`已建立 ${exportType} 匯出任務紀錄。`);
+      setNotice(`已建立「${exportType}」匯出紀錄。`);
       await loadWorkspace();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "建立匯出任務失敗");
+      setError(caught instanceof Error ? caught.message : "建立匯出紀錄失敗。");
     } finally {
       setIsBusy(false);
     }
@@ -201,7 +203,7 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
       { path: "reports/generation_jobs.csv", content: toCsv(generationJobRows) },
       { path: "reports/cost_report.csv", content: toCsv(costRows) },
     ]);
-    await recordExport("full_project_export", "zip");
+    await recordExport("完整任務匯出", "zip");
   }
 
   async function importProjectPackage(file: File) {
@@ -210,10 +212,9 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
       const JSZip = (await import("jszip")).default;
       const zip = await JSZip.loadAsync(await file.arrayBuffer());
       packagePayload = {};
-      await Promise.all(Object.entries(zip.files).map(async ([path, entry]) => {
-        if (entry.dir) return;
-        if (!path.endsWith(".json")) return;
-        packagePayload[path] = await entry.async("string");
+      await Promise.all(Object.entries(zip.files).map(async ([filePath, entry]) => {
+        if (entry.dir || !filePath.endsWith(".json")) return;
+        packagePayload[filePath] = await entry.async("string");
       }));
     } else {
       packagePayload = JSON.parse(await file.text());
@@ -223,27 +224,29 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ package: packagePayload }),
     });
-    setNotice("Project package 已解析並匯入主要 JSON 資料，asset index 已重建。");
+    setNotice("任務資料已匯入。");
     await loadWorkspace();
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">匯出下載中心</h1>
-        <p className="mt-2 text-muted-foreground">下載 SEO、Excel、角色資料庫、圖片、影片、成本報告與完整專案包。</p>
+        <h1 className="text-3xl font-semibold tracking-tight">匯出與備份</h1>
+        <p className="mt-2 text-muted-foreground">
+          下載腳本、分鏡、角色、素材、成本報表與完整任務備份。沒有資料的項目會保持停用，避免下載空檔。
+        </p>
       </div>
       <WorkflowStepper status={project?.status ?? "video_ready"} current="exports" projectId={projectId} />
       {error ? (
         <Alert variant="destructive">
-          <AlertTitle>錯誤</AlertTitle>
+          <AlertTitle>發生錯誤</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
       {notice ? (
         <Alert>
           <CheckIcon aria-hidden="true" />
-          <AlertTitle>狀態更新</AlertTitle>
+          <AlertTitle>已完成</AlertTitle>
           <AlertDescription>{notice}</AlertDescription>
         </Alert>
       ) : null}
@@ -251,32 +254,32 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
       <div className="grid gap-6 xl:grid-cols-[20rem_minmax(0,1fr)_22rem]">
         <Card className="bg-card/80 backdrop-blur">
           <CardHeader>
-            <CardTitle>匯出選項</CardTitle>
-            <CardDescription>檔名使用 project_slug + export_type + 時間。</CardDescription>
+            <CardTitle>可匯出項目</CardTitle>
+            <CardDescription>檔名會自動包含任務名稱、匯出類型與時間。</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            <Button type="button" variant="outline" disabled={!workspace?.seoPackage} onClick={() => downloadWithJob("seo_package", "json", () => downloadBlob(`${projectSlug}_seo_package_${stamp}.json`, workspace?.seoPackage ? seoJsonPayload(workspace.seoPackage, segmentOutlineRows) : "{}", "application/json;charset=utf-8"))}>
+            <Button type="button" variant="outline" disabled={!workspace?.seoPackage} onClick={() => downloadWithJob("SEO 套件", "json", () => downloadBlob(`${projectSlug}_seo_package_${stamp}.json`, workspace?.seoPackage ? seoJsonPayload(workspace.seoPackage, segmentOutlineRows) : "{}", "application/json;charset=utf-8"))}>
               <FileJsonIcon data-icon="inline-start" aria-hidden="true" />
-              SEO Package JSON
+              下載 SEO JSON
             </Button>
-            <Button type="button" variant="outline" disabled={!seoRows.length} onClick={() => downloadWithJob("seo_package", "xlsx", () => downloadXlsx(`${projectSlug}_seo_package_${stamp}.xlsx`, seoRows, "seo_package"))}>SEO Package XLSX</Button>
-            <Button type="button" variant="outline" disabled={!segmentOutlineRows.length} onClick={() => downloadWithJob("segment_outline", "xlsx", () => downloadXlsx(`${projectSlug}_segment_outline_${stamp}.xlsx`, segmentOutlineRows, "segment_outline"))}>Segment Outline XLSX</Button>
-            <Button type="button" variant="outline" disabled={!scriptExportRows.length} onClick={() => downloadWithJob("scripts", "xlsx", () => downloadXlsx(`${projectSlug}_scripts_${stamp}.xlsx`, scriptExportRows, "scripts"))}>Script XLSX</Button>
-            <Button type="button" variant="outline" disabled={!shotExportRows.length} onClick={() => downloadWithJob("shots_prompts", "xlsx", () => downloadXlsx(`${projectSlug}_shots_prompts_${stamp}.xlsx`, shotExportRows, "shots_prompts"))}>Shot Prompt XLSX</Button>
-            <Button type="button" variant="outline" disabled={!characterExportRows.length} onClick={() => downloadWithJob("character_bible", "xlsx", () => downloadXlsx(`${projectSlug}_character_bible_${stamp}.xlsx`, characterExportRows, "character_bible"))}>Character Bible XLSX</Button>
-            <Button type="button" variant="outline" disabled={!characterExportRows.length} onClick={() => downloadWithJob("character_bible", "json", () => downloadBlob(`${projectSlug}_character_bible_${stamp}.json`, JSON.stringify({ characters }, null, 2), "application/json;charset=utf-8"))}>Character Bible JSON</Button>
-            <Button type="button" variant="outline" disabled={!approvedImages.length} onClick={() => downloadWithJob("approved_images", "zip", () => downloadZip(`${projectSlug}_approved_images_${stamp}.zip`, assetDownloadFiles(approvedImages, "approved")))}>Approved Images ZIP</Button>
-            <Button type="button" variant="outline" disabled={!allImages.length} onClick={() => downloadWithJob("all_image_versions", "zip", () => downloadZip(`${projectSlug}_all_image_versions_${stamp}.zip`, assetDownloadFiles(allImages, "all_versions")))}>All Image Versions ZIP</Button>
-            <Button type="button" variant="outline" disabled={!approvedVideos.length} onClick={() => downloadWithJob("approved_videos", "zip", () => downloadZip(`${projectSlug}_approved_videos_${stamp}.zip`, assetDownloadFiles(approvedVideos, "approved")))}>Approved Videos ZIP</Button>
-            <Button type="button" variant="outline" disabled={!allVideos.length} onClick={() => downloadWithJob("all_video_versions", "zip", () => downloadZip(`${projectSlug}_all_video_versions_${stamp}.zip`, assetDownloadFiles(allVideos, "all_versions")))}>All Video Versions ZIP</Button>
-            <Button type="button" variant="outline" disabled={!generationJobRows.length} onClick={() => downloadWithJob("generation_jobs", "xlsx", () => downloadXlsx(`${projectSlug}_generation_jobs_${stamp}.xlsx`, generationJobRows, "generation_jobs"))}>Generation Jobs XLSX</Button>
-            <Button type="button" variant="outline" disabled={!costRows.length} onClick={() => downloadWithJob("cost_report", "xlsx", () => downloadMultiSheetXlsx(`${projectSlug}_cost_report_${stamp}.xlsx`, [{ rows: [costSummary], sheetName: "summary" }, { rows: costRows, sheetName: "cost_report" }]))}>Cost Report XLSX</Button>
+            <Button type="button" variant="outline" disabled={!seoRows.length} onClick={() => downloadWithJob("SEO 套件", "xlsx", () => downloadXlsx(`${projectSlug}_seo_package_${stamp}.xlsx`, seoRows, "seo_package"))}>下載 SEO Excel</Button>
+            <Button type="button" variant="outline" disabled={!segmentOutlineRows.length} onClick={() => downloadWithJob("段落大綱", "xlsx", () => downloadXlsx(`${projectSlug}_segment_outline_${stamp}.xlsx`, segmentOutlineRows, "segment_outline"))}>下載段落大綱</Button>
+            <Button type="button" variant="outline" disabled={!scriptExportRows.length} onClick={() => downloadWithJob("腳本", "xlsx", () => downloadXlsx(`${projectSlug}_scripts_${stamp}.xlsx`, scriptExportRows, "scripts"))}>下載腳本 Excel</Button>
+            <Button type="button" variant="outline" disabled={!shotExportRows.length} onClick={() => downloadWithJob("分鏡提示詞", "xlsx", () => downloadXlsx(`${projectSlug}_shots_prompts_${stamp}.xlsx`, shotExportRows, "shots_prompts"))}>下載分鏡提示詞</Button>
+            <Button type="button" variant="outline" disabled={!characterExportRows.length} onClick={() => downloadWithJob("角色設定", "xlsx", () => downloadXlsx(`${projectSlug}_character_bible_${stamp}.xlsx`, characterExportRows, "character_bible"))}>下載角色設定 Excel</Button>
+            <Button type="button" variant="outline" disabled={!characterExportRows.length} onClick={() => downloadWithJob("角色設定", "json", () => downloadBlob(`${projectSlug}_character_bible_${stamp}.json`, JSON.stringify({ characters }, null, 2), "application/json;charset=utf-8"))}>下載角色設定 JSON</Button>
+            <Button type="button" variant="outline" disabled={!approvedImages.length} onClick={() => downloadWithJob("已確認圖片", "zip", () => downloadZip(`${projectSlug}_approved_images_${stamp}.zip`, assetDownloadFiles(approvedImages, "approved")))}>下載已確認圖片</Button>
+            <Button type="button" variant="outline" disabled={!allImages.length} onClick={() => downloadWithJob("全部圖片版本", "zip", () => downloadZip(`${projectSlug}_all_image_versions_${stamp}.zip`, assetDownloadFiles(allImages, "all_versions")))}>下載全部圖片版本</Button>
+            <Button type="button" variant="outline" disabled={!approvedVideos.length} onClick={() => downloadWithJob("已確認影片", "zip", () => downloadZip(`${projectSlug}_approved_videos_${stamp}.zip`, assetDownloadFiles(approvedVideos, "approved")))}>下載已確認影片</Button>
+            <Button type="button" variant="outline" disabled={!allVideos.length} onClick={() => downloadWithJob("全部影片版本", "zip", () => downloadZip(`${projectSlug}_all_video_versions_${stamp}.zip`, assetDownloadFiles(allVideos, "all_versions")))}>下載全部影片版本</Button>
+            <Button type="button" variant="outline" disabled={!generationJobRows.length} onClick={() => downloadWithJob("API 呼叫紀錄", "xlsx", () => downloadXlsx(`${projectSlug}_generation_jobs_${stamp}.xlsx`, generationJobRows, "generation_jobs"))}>下載 API 呼叫紀錄</Button>
+            <Button type="button" variant="outline" disabled={!costRows.length} onClick={() => downloadWithJob("成本報表", "xlsx", () => downloadMultiSheetXlsx(`${projectSlug}_cost_report_${stamp}.xlsx`, [{ rows: [costSummary], sheetName: "summary" }, { rows: costRows, sheetName: "cost_report" }]))}>下載成本報表</Button>
             <Button type="button" disabled={isBusy || !workspace} onClick={fullProjectZip}>
               <FileArchiveIcon data-icon="inline-start" aria-hidden="true" />
-              Full Project Export ZIP
+              下載完整任務 ZIP
             </Button>
             <Button type="button" variant="outline" onClick={() => document.getElementById("project-import")?.click()}>
-              Project ZIP / JSON 匯入
+              匯入任務 ZIP / JSON
             </Button>
             <input
               id="project-import"
@@ -286,7 +289,7 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (!file) return;
-                importProjectPackage(file).catch((caught) => setError(caught instanceof Error ? caught.message : "匯入失敗"));
+                importProjectPackage(file).catch((caught) => setError(caught instanceof Error ? caught.message : "匯入失敗。"));
               }}
             />
           </CardContent>
@@ -294,17 +297,17 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
 
         <div className="flex flex-col gap-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <StatCard title="Segments" value={String(approvedSegments.length)} description="approved segment outline" icon={FileSpreadsheetIcon} />
-            <StatCard title="Shots" value={String(shots.length)} description="shot prompt rows" icon={ArchiveIcon} />
-            <StatCard title="Assets" value={String(assets.length)} description="images, videos, references, exports" icon={DownloadIcon} />
-            <StatCard title="Approved Images" value={String(approvedImages.length)} description="ready for packaging" icon={CheckIcon} />
-            <StatCard title="Approved Videos" value={String(approvedVideos.length)} description="ready for packaging" icon={CheckIcon} />
-            <StatCard title="Export Jobs" value={String(jobs.filter((job) => job.type === "export").length)} description="export task records" icon={FileArchiveIcon} />
+            <StatCard title="已確認段落" value={String(approvedSegments.length)} description="可匯出的段落大綱" icon={FileSpreadsheetIcon} />
+            <StatCard title="分鏡數" value={String(shots.length)} description="分鏡提示詞列數" icon={ArchiveIcon} />
+            <StatCard title="素材數" value={String(assets.length)} description="圖片、影片與參考素材" icon={DownloadIcon} />
+            <StatCard title="已確認圖片" value={String(approvedImages.length)} description="可打包下載" icon={CheckIcon} />
+            <StatCard title="已確認影片" value={String(approvedVideos.length)} description="可打包下載" icon={CheckIcon} />
+            <StatCard title="匯出紀錄" value={String(jobs.filter((job) => job.type === "export").length)} description="已建立的匯出工作" icon={FileArchiveIcon} />
           </div>
           <Card className="bg-card/80 backdrop-blur">
             <CardHeader>
               <CardTitle>匯出紀錄</CardTitle>
-              <CardDescription>Export 也會建立 GenerationJob。</CardDescription>
+              <CardDescription>每次匯出都會保留一筆工作紀錄，方便追蹤檔案與成本。</CardDescription>
             </CardHeader>
             <CardContent>
               <JobsTable jobs={jobs.filter((job) => job.type === "export")} />
@@ -315,32 +318,32 @@ export function ExportsWorkbench({ projectId }: { projectId: string }) {
         <aside className="flex flex-col gap-4">
           <Card className="bg-card/80 backdrop-blur">
             <CardHeader>
-              <CardTitle>成本報告摘要</CardTitle>
+              <CardTitle>成本摘要</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 text-sm">
-              <p>總任務數：{costSummary.totalJobs}</p>
-              <p>成功任務數：{costSummary.successJobs}</p>
-              <p>失敗任務數：{costSummary.failedJobs}</p>
-              <p>圖片生成總成本：${costSummary.imageCost.toFixed(2)}</p>
-              <p>影片生成總成本：${costSummary.videoCost.toFixed(2)}</p>
+              <p>總紀錄：{costSummary.totalJobs}</p>
+              <p>成功：{costSummary.successJobs}</p>
+              <p>失敗：{costSummary.failedJobs}</p>
+              <p>圖片成本：${costSummary.imageCost.toFixed(2)}</p>
+              <p>影片成本：${costSummary.videoCost.toFixed(2)}</p>
               <p>總成本：${costSummary.totalCost.toFixed(2)}</p>
-              <p>平均每張圖片成本：${costSummary.averageImageCost.toFixed(2)}</p>
-              <p>平均每支影片成本：${costSummary.averageVideoCost.toFixed(2)}</p>
+              <p>平均每張圖片：${costSummary.averageImageCost.toFixed(2)}</p>
+              <p>平均每支影片：${costSummary.averageVideoCost.toFixed(2)}</p>
             </CardContent>
           </Card>
           <Card className="bg-card/80 backdrop-blur">
             <CardHeader>
-              <CardTitle>成本表預覽</CardTitle>
+              <CardTitle>近期成本列</CardTitle>
             </CardHeader>
             <CardContent>
               <DataTable
                 rows={costRows.slice(0, 8)}
                 columns={[
-                  { key: "job_id", header: "job_id" },
-                  { key: "type", header: "type" },
-                  { key: "model", header: "model" },
-                  { key: "status", header: "status" },
-                  { key: "actual_cost", header: "cost" },
+                  { key: "job_id", header: "紀錄" },
+                  { key: "type", header: "類型" },
+                  { key: "model", header: "模型" },
+                  { key: "status", header: "狀態" },
+                  { key: "actual_cost", header: "費用" },
                 ]}
               />
             </CardContent>

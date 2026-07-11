@@ -36,7 +36,7 @@ export type LocalDb = {
   sourceDocuments: SourceDocument[];
   segments: Segment[];
   scripts: Script[];
-  shots: typeof shots;
+  shots: Shot[];
   characters: Character[];
   assets: Asset[];
   generationJobs: GenerationJob[];
@@ -52,7 +52,30 @@ export type LocalDb = {
   textSettings: Record<string, TextWorkbenchSettings>;
 };
 
+// `Shot` type is re-exported via mock-data; declare it here for the LocalDb shape.
+type Shot = (typeof shots)[number];
+
+/**
+ * Backend selection.
+ *
+ * - On Firebase App Hosting / Cloud Run the container filesystem is ephemeral
+ *   and per-instance, so a JSON file on disk cannot persist writes. We use
+ *   Firestore there (Cloud Run always sets `K_SERVICE`).
+ * - Locally (dev / `next build`) we fall back to a JSON file so the app works
+ *   without cloud credentials.
+ *
+ * Set `USE_FIRESTORE=true` (or `false`) to override the auto-detection.
+ */
+const firestoreEnabled = (() => {
+  const override = process.env.USE_FIRESTORE;
+  if (override === "true") return true;
+  if (override === "false") return false;
+  return Boolean(process.env.K_SERVICE);
+})();
+
 const dbPath = path.join(process.cwd(), "data", "local-db.json");
+const FS_COLLECTION = "studio";
+const FS_DOCUMENT = "db";
 
 function seedDb(): LocalDb {
   return {
@@ -77,22 +100,20 @@ function seedDb(): LocalDb {
   };
 }
 
-async function ensureDb() {
-  await mkdir(path.dirname(dbPath), { recursive: true });
-  try {
-    await readFile(dbPath, "utf8");
-  } catch {
-    await writeFile(dbPath, JSON.stringify(seedDb(), null, 2), "utf8");
-  }
-}
-
-export async function readDb(): Promise<LocalDb> {
-  await ensureDb();
-  const raw = await readFile(dbPath, "utf8");
-  const db = JSON.parse(raw) as Partial<LocalDb>;
+/** Merge a partial (possibly older) db payload with the current seed defaults. */
+function normalize(db: Partial<LocalDb>): LocalDb {
+  const seed = seedDb();
   return {
-    ...seedDb(),
+    ...seed,
     ...db,
+    projects: db.projects ?? seed.projects,
+    sourceDocuments: db.sourceDocuments ?? seed.sourceDocuments,
+    segments: db.segments ?? seed.segments,
+    scripts: db.scripts ?? seed.scripts,
+    shots: db.shots ?? seed.shots,
+    characters: db.characters ?? seed.characters,
+    assets: db.assets ?? seed.assets,
+    generationJobs: db.generationJobs ?? seed.generationJobs,
     textSettings: db.textSettings ?? {},
     storyAnalyses: db.storyAnalyses ?? [],
     seoPackages: db.seoPackages ?? [],
@@ -102,19 +123,131 @@ export async function readDb(): Promise<LocalDb> {
     transitions: db.transitions ?? [],
     timelines: db.timelines ?? [],
     studioLogs: db.studioLogs ?? [],
-    providerSettings: db.providerSettings?.length ? db.providerSettings : defaultProviderSettings(),
+    providerSettings: db.providerSettings?.length
+      ? db.providerSettings
+      : defaultProviderSettings(),
   };
 }
 
-export async function writeDb(db: LocalDb) {
+// ---------------------------------------------------------------------------
+// Firestore backend
+//
+// The whole database is stored as a single JSON string inside one document
+// (`studio/db`). Every access reads/writes the full document, matching the
+// existing read-modify-write access pattern, and JSON serialization avoids
+// Firestore's restrictions on `undefined` values and nested arrays.
+// ---------------------------------------------------------------------------
+
+type Firestore = import("firebase-admin/firestore").Firestore;
+
+let firestorePromise: Promise<Firestore> | null = null;
+
+async function getFirestoreDb(): Promise<Firestore> {
+  if (!firestorePromise) {
+    firestorePromise = (async () => {
+      const { getApps, initializeApp } = await import("firebase-admin/app");
+      const { getFirestore } = await import("firebase-admin/firestore");
+      if (!getApps().length) {
+        // On App Hosting/Cloud Run this uses Application Default Credentials
+        // and reads the project id from the injected FIREBASE_CONFIG env var.
+        initializeApp();
+      }
+      return getFirestore();
+    })();
+  }
+  return firestorePromise;
+}
+
+function dbRef(fs: Firestore) {
+  return fs.collection(FS_COLLECTION).doc(FS_DOCUMENT);
+}
+
+function serialize(db: LocalDb) {
+  return { json: JSON.stringify(db), updatedAt: new Date().toISOString() };
+}
+
+function deserialize(raw: unknown): LocalDb {
+  if (typeof raw === "string" && raw.length) {
+    return normalize(JSON.parse(raw) as Partial<LocalDb>);
+  }
+  return seedDb();
+}
+
+async function readFirestore(): Promise<LocalDb> {
+  const fs = await getFirestoreDb();
+  const snapshot = await dbRef(fs).get();
+  if (!snapshot.exists) {
+    const seed = seedDb();
+    await dbRef(fs).set(serialize(seed));
+    return seed;
+  }
+  return deserialize(snapshot.get("json"));
+}
+
+async function writeFirestore(db: LocalDb) {
+  const fs = await getFirestoreDb();
+  await dbRef(fs).set(serialize(db));
+}
+
+async function updateFirestore(
+  mutator: (db: LocalDb) => void | Promise<void>,
+): Promise<LocalDb> {
+  const fs = await getFirestoreDb();
+  const ref = dbRef(fs);
+  let result: LocalDb = seedDb();
+  await fs.runTransaction(async (tx) => {
+    const snapshot = await tx.get(ref);
+    const db = snapshot.exists ? deserialize(snapshot.get("json")) : seedDb();
+    await mutator(db);
+    tx.set(ref, serialize(db));
+    result = db;
+  });
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// JSON file backend (local dev / build)
+// ---------------------------------------------------------------------------
+
+async function ensureFileDb() {
+  await mkdir(path.dirname(dbPath), { recursive: true });
+  try {
+    await readFile(dbPath, "utf8");
+  } catch {
+    await writeFile(dbPath, JSON.stringify(seedDb(), null, 2), "utf8");
+  }
+}
+
+async function readFileDb(): Promise<LocalDb> {
+  await ensureFileDb();
+  const raw = await readFile(dbPath, "utf8");
+  return normalize(JSON.parse(raw) as Partial<LocalDb>);
+}
+
+async function writeFileDb(db: LocalDb) {
   await mkdir(path.dirname(dbPath), { recursive: true });
   await writeFile(dbPath, JSON.stringify(db, null, 2), "utf8");
 }
 
+// ---------------------------------------------------------------------------
+// Public API (backend-agnostic)
+// ---------------------------------------------------------------------------
+
+export async function readDb(): Promise<LocalDb> {
+  return firestoreEnabled ? readFirestore() : readFileDb();
+}
+
+export async function writeDb(db: LocalDb) {
+  return firestoreEnabled ? writeFirestore(db) : writeFileDb(db);
+}
+
 export async function updateDb(mutator: (db: LocalDb) => void | Promise<void>) {
-  const db = await readDb();
+  if (firestoreEnabled) {
+    return updateFirestore(mutator);
+  }
+  const db = await readFileDb();
   await mutator(db);
-  await writeDb(db);
+  await writeFileDb(db);
   return db;
 }
 
@@ -123,28 +256,25 @@ export async function getDbProjectBundle(projectId: string) {
   const project = db.projects.find((item) => item.id === projectId) ?? db.projects[0];
   return {
     project,
-    sourceDocuments: db.sourceDocuments.filter((item) => item.projectId === project.id),
+    sourceDocuments: db.sourceDocuments.filter((item) => item.projectId === project?.id),
     segments: db.segments
-      .filter((item) => item.projectId === project.id)
+      .filter((item) => item.projectId === project?.id)
       .toSorted((a, b) => a.order - b.order),
-    scripts: db.scripts.filter((item) => item.projectId === project.id),
-    shots: db.shots.filter((item) => item.projectId === project.id),
-    characters: db.characters.filter((item) => item.projectId === project.id),
-    assets: db.assets.filter((item) => item.projectId === project.id),
-    generationJobs: db.generationJobs.filter((item) => item.projectId === project.id),
+    scripts: db.scripts.filter((item) => item.projectId === project?.id),
+    shots: db.shots.filter((item) => item.projectId === project?.id),
+    characters: db.characters.filter((item) => item.projectId === project?.id),
+    assets: db.assets.filter((item) => item.projectId === project?.id),
+    generationJobs: db.generationJobs.filter((item) => item.projectId === project?.id),
     presets: db.presets,
-    environments: db.environments.filter((item) => item.projectId === project.id),
-    galleryItems: db.galleryItems.filter((item) => item.projectId === project.id),
-    transitions: db.transitions.filter((item) => item.projectId === project.id),
-    timeline:
-      db.timelines.find((item) => item.projectId === project.id) ?? null,
-    studioLogs: db.studioLogs.filter((item) => !item.projectId || item.projectId === project.id),
+    environments: db.environments.filter((item) => item.projectId === project?.id),
+    galleryItems: db.galleryItems.filter((item) => item.projectId === project?.id),
+    transitions: db.transitions.filter((item) => item.projectId === project?.id),
+    timeline: db.timelines.find((item) => item.projectId === project?.id) ?? null,
+    studioLogs: db.studioLogs.filter((item) => !item.projectId || item.projectId === project?.id),
     providerSettings: db.providerSettings,
-    storyAnalysis:
-      db.storyAnalyses.find((item) => item.projectId === project.id) ?? null,
-    seoPackage:
-      db.seoPackages.find((item) => item.projectId === project.id) ?? null,
-    textSettings: db.textSettings[project.id] ?? null,
+    storyAnalysis: db.storyAnalyses.find((item) => item.projectId === project?.id) ?? null,
+    seoPackage: db.seoPackages.find((item) => item.projectId === project?.id) ?? null,
+    textSettings: project ? db.textSettings[project.id] ?? null : null,
   };
 }
 
@@ -153,7 +283,7 @@ export function slugifyProjectName(name: string) {
     name
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
+      .replace(/[^a-z0-9一-龥]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 48) || "story-project"
   );

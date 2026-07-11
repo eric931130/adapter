@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         provider: input.provider,
         status: "success",
-        message: "Mock connection passed. 真實連線之後接 provider adapter。",
+        message: "連線測試完成。正式串接時會改由服務商 API 驗證。",
       });
     }
 

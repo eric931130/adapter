@@ -187,14 +187,14 @@ export function VideoGenerationWorkbench({ projectId }: { projectId: string }) {
 
   function downloadAsset(asset: Asset | undefined) {
     if (!asset) return;
-    downloadBlob(asset.filename, JSON.stringify({ asset, note: "Mock video metadata asset. Replace with real MP4 adapter later." }, null, 2), "video/mp4");
+    downloadBlob(asset.filename, JSON.stringify({ asset, note: "影片素材中繼資料；接上正式影片服務後可替換為 MP4 檔案。" }, null, 2), "video/mp4");
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">影片生成工作台</h1>
-        <p className="mt-2 text-muted-foreground">預設使用 image-to-video，所有任務都保留版本與 GenerationJob。</p>
+        <p className="mt-2 text-muted-foreground">預設使用圖生影片流程，所有任務都保留版本與 API 紀錄。</p>
       </div>
       <WorkflowStepper status={workspace?.project.status ?? "image_ready"} current="videos" projectId={projectId} />
       {error ? (
@@ -215,7 +215,7 @@ export function VideoGenerationWorkbench({ projectId }: { projectId: string }) {
         <StatCard title="Approved Shots" value={String(shots.length)} description="可進入影片生成的分鏡" icon={VideoIcon} />
         <StatCard title="Approved Videos" value={String(approvedVideos.length)} description="已選為正式影片版本" icon={CheckIcon} />
         <StatCard title="All Versions" value={String(videoAssets.length)} description="不覆蓋舊影片" icon={ArchiveIcon} />
-        <StatCard title="Video Jobs" value={String(jobs.length)} description="GenerationJob type=video" icon={RefreshCcwIcon} />
+        <StatCard title="影片紀錄" value={String(jobs.length)} description="影片生成 API 呼叫" icon={RefreshCcwIcon} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[18rem_minmax(0,1fr)_24rem]">
@@ -267,7 +267,7 @@ export function VideoGenerationWorkbench({ projectId }: { projectId: string }) {
                 {approvedImage?.url ? <img src={approvedImage.url} alt={approvedImage.filename} className="rounded-lg object-contain" /> : <p className="text-sm text-muted-foreground">沒有 approved image，image-to-video disabled。</p>}
               </div>
               <div className="rounded-xl border bg-muted/40 p-3">
-                <div className="mb-2 text-sm font-medium">Mock Video Asset</div>
+                <div className="mb-2 text-sm font-medium">影片素材資料</div>
                 {selectedAsset ? (
                   <div className="flex min-h-48 flex-col justify-center rounded-lg bg-background/70 p-4 text-sm">
                     <p className="font-medium">{selectedAsset.filename}</p>
@@ -363,7 +363,7 @@ export function VideoGenerationWorkbench({ projectId }: { projectId: string }) {
             <CardContent className="flex flex-col gap-3 text-sm">
               <StatusBadge status={readiness.ready ? "success" : "failed"} />
               {readiness.messages.length ? readiness.messages.map((message) => <p key={message} className="text-muted-foreground">{message}</p>) : <p className="text-muted-foreground">檢查通過，可以生成。</p>}
-              <Button type="button" disabled={!selectedShot || !readiness.ready || isBusy} onClick={() => postVideoAction({ action: "generate", shotIds: [selectedShot!.id], settings: settings() }, "單支影片已加入佇列最後方並 mock 生成。")}>
+              <Button type="button" disabled={!selectedShot || !readiness.ready || isBusy} onClick={() => postVideoAction({ action: "generate", shotIds: [selectedShot!.id], settings: settings() }, "單支影片已加入佇列並建立生成紀錄。")}>
                 <RefreshCcwIcon data-icon="inline-start" aria-hidden="true" />
                 生成 / 重新生成單支影片（加入佇列最後方）
               </Button>
@@ -373,7 +373,7 @@ export function VideoGenerationWorkbench({ projectId }: { projectId: string }) {
               <Button type="button" variant="outline" disabled={!selectedShotIds.length || isBusy} onClick={() => postVideoAction({ action: "batch-approve-latest", shotIds: selectedShotIds }, "已批次標記各 shot 最新影片版本為 approved。")}>
                 批次標記 approved
               </Button>
-              <Button type="button" variant="outline" disabled={!shots.length || isBusy} onClick={() => postVideoAction({ action: "generate", allPending: true, settings: settings() }, "全部 pending 影片已批次 mock 生成。")}>
+              <Button type="button" variant="outline" disabled={!shots.length || isBusy} onClick={() => postVideoAction({ action: "generate", allPending: true, settings: settings() }, "全部待處理影片已批次建立生成紀錄。")}>
                 批次生成全部 pending
               </Button>
               <Button type="button" variant="outline" onClick={() => postVideoAction({ action: "cancel-pending" }, "已取消 pending / queued video jobs。")}>
@@ -425,8 +425,8 @@ export function VideoGenerationWorkbench({ projectId }: { projectId: string }) {
               <Button type="button" variant="outline" disabled={!videoAssets.length} onClick={() => downloadZip(`${projectSlug}_all_video_versions.zip`, assetDownloadFiles(videoAssets, "all_versions"))}>下載 all versions ZIP</Button>
               <Button type="button" variant="outline" disabled={!selectedVideoAssets.length} onClick={() => downloadZip(`${projectSlug}_selected_videos.zip`, assetDownloadFiles(selectedVideoAssets, "selected"))}>批次下載選中影片</Button>
               <Button type="button" variant="outline" disabled={!selectedShotIds.length} onClick={() => postVideoAction({ action: "generate", shotIds: selectedShotIds, settings: settings() }, "選取影片已批次重新生成並排到最後。")}>批次重新生成選中影片</Button>
-              <Button type="button" variant="outline" disabled={!selectedShotIds.length || isBusy} onClick={() => postTimelineAction({ action: "auto-build" }, "選取影片已準備加入 timeline；MVP 依 approved videos 自動排列。")}>批次加入 timeline</Button>
-              <Button type="button" variant="outline" disabled={!approvedVideos.length || isBusy} onClick={() => postTimelineAction({ action: "mock-export" }, "已批次合併 approved videos，輸出 final video placeholder。")}>批次合併</Button>
+              <Button type="button" variant="outline" disabled={!selectedShotIds.length || isBusy} onClick={() => postTimelineAction({ action: "auto-build" }, "已依已確認影片建立時間軸排列。")}>批次加入時間軸</Button>
+              <Button type="button" variant="outline" disabled={!approvedVideos.length || isBusy} onClick={() => postTimelineAction({ action: "mock-export" }, "已建立已確認影片的合併輸出紀錄。")}>建立合併輸出紀錄</Button>
             </CardContent>
           </Card>
         </aside>

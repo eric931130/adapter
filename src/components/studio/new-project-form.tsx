@@ -20,8 +20,8 @@ import { getImageModelOptions, getVideoModelOptions } from "@/lib/model-capabili
 
 export function NewProjectForm() {
   const router = useRouter();
-  const [name, setName] = useState("新故事影音專案");
-  const [description, setDescription] = useState("輸入故事原稿、目標平台、風格方向與預算限制。");
+  const [name, setName] = useState("短影音生成任務");
+  const [description, setDescription] = useState("貼上故事、企劃或腳本後，依序產生分段、分鏡、圖片提示詞與影片生成紀錄。");
   const [segmentCount, setSegmentCount] = useState(5);
   const [costLimit, setCostLimit] = useState(80);
   const [imageModel, setImageModel] = useState("mock-image-cinematic-v1");
@@ -34,7 +34,7 @@ export function NewProjectForm() {
   async function createProject() {
     setError("");
     if (!name.trim()) {
-      setError("請輸入專案名稱。");
+      setError("請輸入任務名稱。");
       return;
     }
     setIsCreating(true);
@@ -56,10 +56,10 @@ export function NewProjectForm() {
         }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "建立專案失敗");
+      if (!response.ok) throw new Error(payload.error ?? "建立任務失敗。");
       router.push(`/projects/${payload.projectId}/text`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "建立專案失敗");
+      setError(caught instanceof Error ? caught.message : "建立任務失敗。");
     } finally {
       setIsCreating(false);
     }
@@ -69,34 +69,34 @@ export function NewProjectForm() {
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <Card className="bg-card/80 backdrop-blur">
         <CardHeader>
-          <CardTitle>建立專案</CardTitle>
+          <CardTitle>建立新任務</CardTitle>
           <CardDescription>
-            MVP 會寫入本地 JSON DB，後續可替換為 Prisma / SQLite / PostgreSQL。
+            建立後會直接進入文本工作台。系統只保存任務資料、生成紀錄與 API 費用，不需要登入、註冊或積分。
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           {error ? (
             <Alert variant="destructive">
-              <AlertTitle>錯誤</AlertTitle>
+              <AlertTitle>建立失敗</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="project-name">專案名稱</FieldLabel>
+              <FieldLabel htmlFor="project-name">任務名稱</FieldLabel>
               <Input id="project-name" value={name} onChange={(event) => setName(event.target.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="project-description">描述</FieldLabel>
+              <FieldLabel htmlFor="project-description">任務說明</FieldLabel>
               <Textarea id="project-description" value={description} onChange={(event) => setDescription(event.target.value)} rows={5} />
             </Field>
             <div className="grid gap-4 md:grid-cols-2">
               <Field>
-                <FieldLabel>預設分段數</FieldLabel>
+                <FieldLabel>預設段落數</FieldLabel>
                 <Input type="number" value={segmentCount} min={1} max={20} onChange={(event) => setSegmentCount(Number(event.target.value))} />
               </Field>
               <Field>
-                <FieldLabel>成本上限</FieldLabel>
+                <FieldLabel>費用提醒上限 USD</FieldLabel>
                 <Input type="number" value={costLimit} min={0} onChange={(event) => setCostLimit(Number(event.target.value))} />
               </Field>
             </div>
@@ -130,7 +130,7 @@ export function NewProjectForm() {
               data-testid="create-project-submit"
             >
               <PlusIcon data-icon="inline-start" aria-hidden="true" />
-              {isCreating ? "建立中..." : "建立專案並進入文本工作台"}
+              {isCreating ? "建立中..." : "建立並進入文本工作台"}
             </Button>
           </FieldGroup>
         </CardContent>
@@ -138,21 +138,21 @@ export function NewProjectForm() {
       <div className="flex flex-col gap-4">
         <Alert className="bg-card/80 backdrop-blur">
           <AlertTriangleIcon aria-hidden="true" />
-          <AlertTitle>後續結果過期提醒</AlertTitle>
+          <AlertTitle>費用提醒</AlertTitle>
           <AlertDescription>
-            回到前一階段修改後，劇本、分鏡、圖片與影片可能需要重新生成。
+            費用上限是提醒與防呆設定，不是積分。實際支出仍以你設定的 API 服務商帳單為準。
           </AlertDescription>
         </Alert>
         <Card className="bg-card/80 backdrop-blur">
           <CardHeader>
-            <CardTitle>{name}</CardTitle>
-            <CardDescription>Project defaults preview</CardDescription>
+            <CardTitle>{name || "新任務"}</CardTitle>
+            <CardDescription>任務設定摘要</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2 text-sm text-muted-foreground">
-            <p>Type: shorts</p>
-            <p>Language: zh</p>
-            <p>Aspect ratio: 9:16</p>
-            <p>Storage: local JSON now, Prisma-ready later</p>
+            <p>影片比例：9:16</p>
+            <p>語言：繁體中文</p>
+            <p>預設段落：{segmentCount} 段</p>
+            <p>費用提醒：${costLimit.toFixed(2)}</p>
           </CardContent>
         </Card>
       </div>

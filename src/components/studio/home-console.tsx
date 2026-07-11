@@ -1,257 +1,237 @@
 "use client";
 
-import Image from "next/image";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo } from "react";
 import {
+  AlertCircleIcon,
   ArrowRightIcon,
-  BellIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  CircleXIcon,
-  CloudDownloadIcon,
-  DiamondIcon,
-  FileSearchIcon,
-  Grid2X2Icon,
-  ImageIcon,
-  PauseIcon,
-  PenLineIcon,
-  PlayIcon,
+  CheckCircle2Icon,
+  ClockIcon,
+  DollarSignIcon,
+  FileTextIcon,
+  FolderIcon,
   PlusIcon,
-  SearchIcon,
   SparklesIcon,
-  StarIcon,
-  UploadCloudIcon,
-  UsersIcon,
-  VideoIcon,
 } from "lucide-react";
 
 import type { LocalDb } from "@/lib/local-db";
+import type { GenerationJob, Project } from "@/lib/schemas";
 
-type AssetTab = "圖片" | "影片" | "角色" | "場景";
+const projectStatusLabels: Record<Project["status"], string> = {
+  draft: "草稿",
+  text_ready: "文本完成",
+  storyboard_ready: "分鏡完成",
+  image_ready: "圖片完成",
+  video_ready: "影片完成",
+  completed: "已完成",
+};
 
-const steps = [
-  ["文本分析", "完成", 100, FileSearchIcon, "#1689ff"],
-  ["SEO 包裝", "完成", 100, SearchIcon, "#20b6aa"],
-  ["正式劇本", "進行中", 72, PenLineIcon, "#7c5cff"],
-  ["分鏡提示詞", "完成", 100, Grid2X2Icon, "#7c5cff"],
-  ["角色與場景一致性", "進行中", 58, UsersIcon, "#20b6aa"],
-  ["圖片生成", "等待中", 0, ImageIcon, "#20b6aa"],
-  ["影片生成", "等待中", 0, VideoIcon, "#e9579d"],
-  ["匯出下載", "等待中", 0, CloudDownloadIcon, "#57718b"],
-] as const;
+const projectStatusProgress: Record<Project["status"], number> = {
+  draft: 8,
+  text_ready: 30,
+  storyboard_ready: 55,
+  image_ready: 78,
+  video_ready: 92,
+  completed: 100,
+};
 
-const projects = [
-  ["雲之國的奇幻旅程", "更新於 2025-05-18 14:30", "/dream-assets/sky-thumb-01.png", 72, "進行中", true],
-  ["時光郵差", "更新於 2025-05-17 09:21", "/dream-assets/sky-thumb-06.png", 35, "進行中", false],
-  ["星塵拓荒者", "更新於 2025-05-16 18:45", "/dream-assets/sky-thumb-04.png", 100, "已完成", true],
-] as const;
+const jobStatusLabels: Record<GenerationJob["status"], string> = {
+  pending: "等待中",
+  queued: "排隊中",
+  running: "執行中",
+  success: "成功",
+  failed: "失敗",
+  expired: "已過期",
+  cancelled: "已取消",
+};
 
-const assets: Array<{ tab: AssetTab; image: string; title: string }> = [
-  { tab: "圖片", image: "/dream-assets/sky-thumb-02.png", title: "浮空城堡" },
-  { tab: "圖片", image: "/dream-assets/sky-thumb-05.png", title: "粉色雲樹" },
-  { tab: "圖片", image: "/dream-assets/sky-thumb-07.png", title: "雲端主城" },
-  { tab: "影片", image: "/dream-assets/sky-thumb-08.png", title: "日落飛行" },
-  { tab: "角色", image: "/dream-assets/sky-thumb-03.png", title: "旅人剪影" },
-  { tab: "場景", image: "/dream-assets/sky-thumb-09.png", title: "雲廊遠景" },
-  { tab: "場景", image: "/dream-assets/sky-thumb-10.png", title: "飛船港口" },
-  { tab: "影片", image: "/dream-assets/sky-thumb-11.png", title: "粉紫終章" },
-  { tab: "圖片", image: "/dream-assets/sky-thumb-12.png", title: "月光雲海" },
-];
+const jobTypeLabels: Record<GenerationJob["type"], string> = {
+  text_analysis: "文本分析",
+  prompt_generation: "提示詞生成",
+  image: "圖片 API",
+  video: "影片 API",
+  transition: "轉場 API",
+  export: "匯出",
+};
 
-const initialJobs = [
-  [1847, "影片生成任務 #1847", "雲之國的奇幻旅程 | 第 12 段", "/dream-assets/sky-thumb-02.png", 68, "剩餘 2 分鐘", "#1689ff"],
-  [1846, "圖片生成任務 #1846", "時光郵差 | 角色：女主角", "/dream-assets/sky-thumb-06.png", 100, "已完成", "#20b6aa"],
-  [1845, "影片生成任務 #1845", "星塵拓荒者 | 第 04 段", "/dream-assets/sky-thumb-04.png", 33, "剩餘 5 分鐘", "#7c5cff"],
-  [1844, "分鏡生成任務 #1844", "新專案 | 分鏡提示詞", "/dream-assets/sky-thumb-03.png", 15, "排隊中", "#ff8a1d"],
-] as const;
-
-type QueueJob = (typeof initialJobs)[number];
-
-function ProgressBar({ value, color }: { value: number; color: string }) {
+function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-[#cbddeb]">
-      <span className="block h-full rounded-full" style={{ width: `${value}%`, background: color }} />
+    <section className={`rounded-2xl border border-white/70 bg-white/58 shadow-[0_22px_48px_rgba(56,139,219,0.15)] backdrop-blur-2xl ${className}`}>
+      {children}
+    </section>
+  );
+}
+
+function MetricCard({
+  title,
+  value,
+  note,
+  icon: Icon,
+}: {
+  title: string;
+  value: string;
+  note: string;
+  icon: typeof FolderIcon;
+}) {
+  return (
+    <Panel className="p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-[#5f7f9d]">{title}</p>
+          <p className="mt-2 text-3xl font-black text-[#0b315e]">{value}</p>
+          <p className="mt-1 text-xs font-semibold text-[#6f8aa3]">{note}</p>
+        </div>
+        <div className="grid size-11 place-items-center rounded-xl bg-[#e6f3ff] text-[#0078ff]">
+          <Icon aria-hidden="true" className="size-5" />
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+function EmptyState({ text, action }: { text: string; action?: React.ReactNode }) {
+  return (
+    <div className="grid place-items-center gap-3 rounded-xl border border-dashed border-[#9cc4e8] bg-white/45 px-4 py-10 text-center">
+      <p className="text-sm font-semibold text-[#4e7294]">{text}</p>
+      {action}
     </div>
   );
 }
 
-function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-[22px] border border-white/70 bg-white/52 shadow-[0_22px_48px_rgba(56,139,219,0.15)] backdrop-blur-2xl ${className}`}>{children}</section>;
+function ProgressBar({ value }: { value: number }) {
+  return (
+    <div className="h-2 overflow-hidden rounded-full bg-[#cbddeb]">
+      <span className="block h-full rounded-full bg-[#1689ff]" style={{ width: `${value}%` }} />
+    </div>
+  );
 }
 
 export function HomeConsole({ db }: { db: LocalDb }) {
-  const [activeTab, setActiveTab] = useState<AssetTab>("圖片");
-  const [jobs, setJobs] = useState<QueueJob[]>([...initialJobs]);
-  const [pausedIds, setPausedIds] = useState<Set<number>>(new Set());
-  const [notice, setNotice] = useState("讓 AI 助你從想法到影片，快速實現創意！");
-  const visibleAssets = useMemo(() => {
-    const selected = assets.filter((item) => item.tab === activeTab);
-    return selected.length >= 6 ? selected : assets;
-  }, [activeTab]);
+  const recentProjects = useMemo(
+    () => [...db.projects].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)).slice(0, 6),
+    [db.projects],
+  );
+
+  const recentJobs = useMemo(
+    () => [...db.generationJobs].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 8),
+    [db.generationJobs],
+  );
+
+  const totalCost = db.generationJobs.reduce((sum, job) => sum + (job.actualCost ?? job.estimatedCost ?? 0), 0);
+  const runningJobs = db.generationJobs.filter((job) => job.status === "running" || job.status === "queued").length;
+  const failedJobs = db.generationJobs.filter((job) => job.status === "failed").length;
+  const avgCost = db.generationJobs.length ? totalCost / db.generationJobs.length : 0;
+
+  const projectNameById = (projectId: string) =>
+    db.projects.find((project) => project.id === projectId)?.name ?? "未命名任務";
 
   return (
-    <div className="mx-auto grid min-h-[calc(100vh-32px)] max-w-[1510px] gap-4">
-      <header className="flex items-center justify-end gap-3">
-        <div className="hidden items-center gap-2 rounded-full border border-white/75 bg-white/42 px-5 py-3 text-sm font-extrabold text-[#0d385f] shadow-[0_12px_28px_rgba(56,139,219,0.12)] backdrop-blur-xl sm:flex">
-          <span className="size-2.5 rounded-full bg-[#20e7ce] shadow-[0_0_10px_#20e7ce]" />
-          系統狀態
+    <div className="mx-auto grid min-h-[calc(100vh-32px)] max-w-[1440px] gap-4">
+      <header className="flex flex-col gap-4 rounded-3xl border border-white/70 bg-white/55 p-6 shadow-[0_22px_48px_rgba(56,139,219,0.14)] backdrop-blur-2xl lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-bold text-[#1477d9]">影片生成工具</p>
+          <h1 className="mt-2 text-4xl font-black leading-tight text-[#0b315e]">從文本到分鏡、圖片、影片與費用紀錄</h1>
+          <p className="mt-3 max-w-3xl text-base font-medium leading-7 text-[#315e86]">
+            這裡是工作台，不是產品官網。所有入口都直接進入可操作流程，並即時顯示 API 呼叫量、失敗數與預估費用。
+          </p>
         </div>
-        <div className="hidden rounded-full border border-white/75 bg-white/42 px-5 py-3 text-sm font-bold text-[#315e86] shadow-[0_12px_28px_rgba(56,139,219,0.12)] backdrop-blur-xl md:block">專案 {db.projects.length}</div>
-        <button type="button" className="flex h-12 items-center gap-2 rounded-full border border-white/75 bg-white/42 px-5 font-bold text-[#0d385f] shadow-[0_12px_28px_rgba(56,139,219,0.12)] backdrop-blur-xl">
-          <DiamondIcon aria-hidden="true" className="size-5 text-[#1689ff]" />
-          12,450
-          <ChevronDownIcon aria-hidden="true" className="size-4" />
-        </button>
-        <button type="button" className="relative grid size-12 place-items-center rounded-full border border-white/75 bg-white/42 text-[#0d385f] shadow-[0_12px_28px_rgba(56,139,219,0.12)] backdrop-blur-xl" aria-label="Notifications">
-          <BellIcon aria-hidden="true" className="size-5" />
-          <span className="absolute right-3 top-3 size-2 rounded-full bg-[#ff2367]" />
-        </button>
+        <Link
+          href="/projects/new"
+          className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/80 bg-[linear-gradient(180deg,#48b9ff,#007bff)] px-5 font-bold text-white shadow-[0_12px_28px_rgba(0,124,255,0.28)] transition hover:-translate-y-0.5"
+        >
+          <PlusIcon aria-hidden="true" className="size-5" />
+          建立新任務
+        </Link>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-[1.18fr_0.82fr]">
-        <div className="relative min-h-[288px] overflow-hidden rounded-[28px] px-7 py-8 md:px-10">
-          <Image src="/dream-assets/sky-thumb-02.png" alt="" fill sizes="(max-width: 1024px) 100vw, 770px" className="object-cover" priority />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(235,248,255,0.94)_0%,rgba(235,248,255,0.82)_42%,rgba(235,248,255,0.32)_100%)]" />
-          <div className="relative z-10 max-w-[640px]">
-            <h1 className="text-[clamp(2.25rem,5vw,4rem)] font-black leading-[1.08] text-[#0b315e]">AI 故事影音自動化生成平台</h1>
-            <p className="mt-5 max-w-[520px] text-xl font-bold leading-9 text-[#1f4a72]">從故事原稿到 SEO 劇本、分鏡、角色一致性、圖片、影片與完整匯出。</p>
-            <div className="mt-9 flex flex-wrap gap-4">
-              <button type="button" onClick={() => setNotice("已建立新專案草稿，流程從文本分析開始")} className="inline-flex h-[62px] min-w-[190px] items-center justify-center gap-3 rounded-2xl border border-white/80 bg-[linear-gradient(180deg,#48b9ff,#007bff)] px-7 text-lg font-extrabold text-white shadow-[0_18px_34px_rgba(0,124,255,0.34)] transition hover:-translate-y-0.5">
-                <SparklesIcon aria-hidden="true" className="size-6" />
-                開始新專案
-              </button>
-              <button type="button" onClick={() => setNotice("ZIP 匯入檢查已啟動，等待選擇檔案")} className="inline-flex h-[62px] min-w-[190px] items-center justify-center gap-3 rounded-2xl border border-white/90 bg-white/46 px-7 text-lg font-extrabold text-[#0078ff] shadow-[0_12px_28px_rgba(56,139,219,0.12)] transition hover:-translate-y-0.5 hover:bg-white/64">
-                <UploadCloudIcon aria-hidden="true" className="size-6" />
-                匯入專案 ZIP
-              </button>
-            </div>
-          </div>
-        </div>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="任務數" value={String(db.projects.length)} note="目前保存在工作區的任務" icon={FolderIcon} />
+        <MetricCard title="API 呼叫紀錄" value={String(db.generationJobs.length)} note={`${runningJobs} 筆正在排隊或執行`} icon={ClockIcon} />
+        <MetricCard title="即時預估費用" value={`$${totalCost.toFixed(2)}`} note={`平均每筆 $${avgCost.toFixed(2)}`} icon={DollarSignIcon} />
+        <MetricCard title="需要處理" value={String(failedJobs)} note="失敗紀錄可到任務內重新排程" icon={AlertCircleIcon} />
+      </section>
 
-        <Panel className="p-7">
-          <div className="mb-6 flex items-center gap-3">
+      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Panel className="p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-2xl font-black text-[#0b315e]">近期任務</h2>
+            <Link href="/projects/new" className="inline-flex items-center gap-1 text-sm font-bold text-[#1477d9] hover:underline">
+              新增
+              <ArrowRightIcon aria-hidden="true" className="size-4" />
+            </Link>
+          </div>
+          {recentProjects.length ? (
+            <div className="grid gap-3">
+              {recentProjects.map((project) => {
+                const progress = projectStatusProgress[project.status] ?? 0;
+                return (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className="grid gap-3 rounded-xl border border-white/70 bg-white/55 p-4 shadow-[0_12px_28px_rgba(56,139,219,0.1)] transition hover:-translate-y-0.5 hover:bg-white/75 md:grid-cols-[1fr_8rem]"
+                  >
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-extrabold text-[#123a64]">{project.name}</h3>
+                      <p className="mt-1 line-clamp-1 text-sm font-medium text-[#6a86a1]">{project.description || "尚未填寫描述"}</p>
+                      <div className="mt-3">
+                        <ProgressBar value={progress} />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 md:grid md:place-items-end">
+                      <span className="rounded-full bg-[#e6f3ff] px-3 py-1 text-xs font-bold text-[#1477d9]">
+                        {projectStatusLabels[project.status] ?? project.status}
+                      </span>
+                      <span className="text-xs font-semibold text-[#6a86a1]">{project.updatedAt.slice(0, 10)}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState
+              text="還沒有任務。建立一個任務後，就能開始貼上文本、切分段落並產生分鏡。"
+              action={
+                <Link href="/projects/new" className="inline-flex items-center gap-2 rounded-xl bg-[#0078ff] px-4 py-2 text-sm font-bold text-white">
+                  <PlusIcon aria-hidden="true" className="size-4" />
+                  建立第一個任務
+                </Link>
+              }
+            />
+          )}
+        </Panel>
+
+        <Panel className="p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-2xl font-black text-[#0b315e]">API 用量與費用</h2>
             <SparklesIcon aria-hidden="true" className="size-6 text-[#1689ff]" />
-            <h2 className="text-2xl font-black text-[#0b315e]">今日創作流程</h2>
           </div>
-          <div className="flex items-start overflow-x-auto pb-1">
-            {[
-              ["文本分析", FileSearchIcon, "#1689ff"],
-              ["分鏡生成", Grid2X2Icon, "#8c63ff"],
-              ["圖片生成", ImageIcon, "#22c8cf"],
-              ["影片生成", VideoIcon, "#ef5fa8"],
-            ].map(([label, Icon, color], index) => (
-              <div key={String(label)} className="flex flex-1 items-center">
-                <div className="grid min-w-[116px] justify-items-center gap-3 text-center">
-                  <div className="flex size-[86px] items-center justify-center rounded-full border-[5px] border-white/80 bg-white/55" style={{ color: String(color), boxShadow: `0 0 26px ${String(color)}55` }}>
-                    <Icon aria-hidden="true" className="size-9" />
+          {recentJobs.length ? (
+            <div className="grid gap-3">
+              {recentJobs.map((job) => (
+                <Link
+                  key={job.id}
+                  href={`/projects/${job.projectId}/jobs`}
+                  className="grid grid-cols-[44px_1fr_auto] items-center gap-3 rounded-xl border border-white/70 bg-white/55 p-3 shadow-[0_12px_28px_rgba(56,139,219,0.1)] transition hover:bg-white/75"
+                >
+                  <div className="grid size-11 place-items-center rounded-xl bg-[#e6f3ff] text-[#0078ff]">
+                    {job.status === "success" ? <CheckCircle2Icon aria-hidden="true" className="size-5" /> : <FileTextIcon aria-hidden="true" className="size-5" />}
                   </div>
-                  <p className="text-base font-extrabold text-[#10365f]">{String(label)}</p>
-                </div>
-                {index < 3 ? <ArrowRightIcon aria-hidden="true" className="mx-3 size-7 text-[#2e7ed3]" /> : null}
-              </div>
-            ))}
-          </div>
-          <div className="mt-7 border-t border-[#98c9ee] pt-4 text-sm font-bold text-[#2a669a]">{notice}</div>
-        </Panel>
-      </section>
-
-      <Panel className="rounded-[24px] p-3">
-        <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
-          {steps.map(([title, status, progress, Icon, color], index) => (
-            <div key={title} className="flex min-h-[136px] flex-col justify-between rounded-2xl border border-white/75 bg-white/45 p-4 shadow-[0_12px_24px_rgba(56,139,219,0.12)]">
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-xl font-semibold" style={{ color }}>{String(index + 1).padStart(2, "0")}</span>
-                <span className="rounded-full bg-white/58 px-2 py-1 text-[11px] font-bold text-[#6383a1]">{status}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Icon aria-hidden="true" className="size-10 shrink-0" style={{ color }} />
-                <p className="text-sm font-extrabold text-[#13395f]">{title}</p>
-              </div>
-              <div className="grid gap-1.5">
-                <div className="text-[11px] font-bold" style={{ color }}>{progress}%</div>
-                <ProgressBar value={progress} color={color} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      <section className="grid gap-4 xl:grid-cols-[1.08fr_1fr_1.08fr]">
-        <Panel className="p-5">
-          <PanelTitle title="近期專案" suffix="查看全部" />
-          <div className="grid gap-3">
-            {projects.map(([title, updated, image, progress, status, favorite]) => (
-              <article key={title} className="grid grid-cols-[126px_1fr_70px] gap-4 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-[0_12px_28px_rgba(56,139,219,0.12)]">
-                <div className="relative h-[88px] overflow-hidden rounded-xl"><Image src={image} alt={title} fill sizes="126px" className="object-cover" /></div>
-                <div className="min-w-0 py-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="truncate text-lg font-extrabold text-[#123a64]">{title}</h3>
-                    <StarIcon aria-hidden="true" className={`size-4 shrink-0 ${favorite ? "fill-[#ff9f1c] text-[#ff9f1c]" : "text-[#7190ac]"}`} />
-                  </div>
-                  <p className="mt-1 text-xs font-semibold text-[#6a86a1]">{updated}</p>
-                </div>
-                <div className="grid place-items-center text-xs font-bold text-[#5d7f9d]">{progress}%<span>{status}</span></div>
-              </article>
-            ))}
-          </div>
-          <button type="button" onClick={() => setNotice("新專案建立入口已準備好")} className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/80 bg-white/48 text-base font-extrabold text-[#0078ff] shadow-[0_10px_24px_rgba(56,139,219,0.1)] transition hover:bg-white/70">
-            <PlusIcon aria-hidden="true" className="size-5" />
-            建立新專案
-          </button>
-        </Panel>
-
-        <Panel className="p-5">
-          <PanelTitle title="近期資產" suffix="查看全部" />
-          <div className="mb-4 grid grid-cols-4 rounded-xl border border-white/70 bg-[#dcecff]/70 p-1">
-            {(["圖片", "影片", "角色", "場景"] as AssetTab[]).map((tab) => (
-              <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`h-9 rounded-lg text-sm font-extrabold transition ${activeTab === tab ? "bg-[linear-gradient(180deg,#4abaff,#0078ff)] text-white shadow-[0_10px_22px_rgba(0,120,255,0.22)]" : "text-[#315e86] hover:bg-white/52"}`}>{tab}</button>
-            ))}
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {visibleAssets.slice(0, 9).map((asset, index) => (
-              <button key={`${asset.title}-${index}`} type="button" className="relative aspect-[1.34] overflow-hidden rounded-xl border border-white/75 shadow-[0_10px_22px_rgba(56,139,219,0.14)]">
-                <Image src={asset.image} alt={asset.title} fill sizes="120px" className="object-cover" />
-              </button>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel className="p-5">
-          <PanelTitle title="生成佇列" suffix={`查看全部 (${jobs.length})`} />
-          <div className="grid gap-3">
-            {jobs.map(([id, title, detail, image, progress, status, color]) => {
-              const paused = pausedIds.has(Number(id));
-              return (
-                <article key={id} className="grid grid-cols-[86px_1fr_auto] items-center gap-4 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-[0_12px_28px_rgba(56,139,219,0.12)]">
-                  <div className="relative h-[60px] overflow-hidden rounded-xl"><Image src={String(image)} alt={String(title)} fill sizes="86px" className="object-cover" /></div>
                   <div className="min-w-0">
-                    <div className="flex items-center justify-between gap-3"><h3 className="truncate text-sm font-extrabold text-[#123a64]">{title}</h3><span className="text-[#7190ac]">{paused ? "已暫停" : status}</span></div>
-                    <p className="mt-1 truncate text-[11px] font-semibold text-[#7893aa]">{detail}</p>
-                    <div className="mt-3 flex items-center gap-3"><div className="flex-1"><ProgressBar value={Number(progress)} color={String(color)} /></div><span className="w-10 text-right text-xs font-bold text-[#607f9b]">{progress}%</span></div>
+                    <h3 className="truncate text-sm font-extrabold text-[#123a64]">{jobTypeLabels[job.type] ?? job.type}</h3>
+                    <p className="mt-1 truncate text-xs font-semibold text-[#7893aa]">{projectNameById(job.projectId)}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setPausedIds((current) => new Set(current).has(Number(id)) ? new Set([...current].filter((item) => item !== Number(id))) : new Set(current).add(Number(id)))} className="grid size-9 place-items-center rounded-full bg-[#e6f3ff] text-[#2f6ea8] transition hover:bg-white" aria-label="Pause job">
-                      {paused ? <PlayIcon aria-hidden="true" className="size-4" /> : <PauseIcon aria-hidden="true" className="size-4" />}
-                    </button>
-                    <button type="button" onClick={() => setJobs((current) => current.filter((item) => item[0] !== id))} className="grid size-9 place-items-center rounded-full bg-[#e6f3ff] text-[#6c8399] transition hover:bg-white" aria-label="Remove job">
-                      <CircleXIcon aria-hidden="true" className="size-4" />
-                    </button>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-[#0b315e]">${(job.actualCost ?? job.estimatedCost ?? 0).toFixed(2)}</p>
+                    <p className="text-xs font-bold text-[#607f9b]">{jobStatusLabels[job.status] ?? job.status}</p>
                   </div>
-                </article>
-              );
-            })}
-          </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyState text="還沒有 API 呼叫紀錄。完成文本分析或生成任務後，這裡會顯示即時費用。" />
+          )}
         </Panel>
       </section>
-    </div>
-  );
-}
-
-function PanelTitle({ title, suffix }: { title: string; suffix: string }) {
-  return (
-    <div className="mb-4 flex items-center justify-between">
-      <h2 className="text-2xl font-black text-[#0b315e]">{title}</h2>
-      <span className="inline-flex items-center gap-1 text-sm font-bold text-[#1477d9]">{suffix}<ArrowRightIcon aria-hidden="true" className="size-4" /></span>
     </div>
   );
 }

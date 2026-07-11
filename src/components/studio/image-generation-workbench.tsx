@@ -139,14 +139,14 @@ export function ImageGenerationWorkbench({ projectId }: { projectId: string }) {
 
   function downloadAsset(asset: Asset | undefined, format: "png" | "jpg") {
     if (!asset) return;
-    downloadBlob(asset.filename.replace(/\.[^.]+$/, `.${format}`), JSON.stringify({ asset, note: "Mock image asset. The SVG dataUrl is in asset.url." }, null, 2), format === "png" ? "image/png" : "image/jpeg");
+    downloadBlob(asset.filename.replace(/\.[^.]+$/, `.${format}`), JSON.stringify({ asset, note: "圖片素材資料，原始 dataUrl 保存在 asset.url。" }, null, 2), format === "png" ? "image/png" : "image/jpeg");
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">圖片生成工作台</h1>
-        <p className="mt-2 text-muted-foreground">所有圖片生成都會建立 GenerationJob，成功後新增 Asset version。</p>
+        <p className="mt-2 text-muted-foreground">所有圖片生成都會建立 API 紀錄，成功後新增素材版本。</p>
       </div>
       <WorkflowStepper status={workspace?.project.status ?? "storyboard_ready"} current="images" projectId={projectId} />
       {error ? (
@@ -167,7 +167,7 @@ export function ImageGenerationWorkbench({ projectId }: { projectId: string }) {
         <StatCard title="Approved Shots" value={String(shots.length)} description="可進入圖片生成的分鏡" icon={ImageIcon} />
         <StatCard title="Approved Images" value={String(approvedImages.length)} description="已選為正式圖片版本" icon={CheckIcon} />
         <StatCard title="All Versions" value={String(imageAssets.length)} description="不覆蓋舊圖，保留版本" icon={ArchiveIcon} />
-        <StatCard title="Image Jobs" value={String(jobs.length)} description="GenerationJob type=image" icon={RefreshCcwIcon} />
+        <StatCard title="圖片紀錄" value={String(jobs.length)} description="圖片生成 API 呼叫" icon={RefreshCcwIcon} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[18rem_minmax(0,1fr)_24rem]">
@@ -255,7 +255,7 @@ export function ImageGenerationWorkbench({ projectId }: { projectId: string }) {
                   <option value={4}>4 張</option>
                 </select>
               </Field>
-              <Button type="button" disabled={!selectedShot || !readiness.ready || isBusy} onClick={() => postImageAction({ action: "generate", shotIds: [selectedShot!.id], candidateCount }, "單張圖片已加入佇列最後方並 mock 生成候選圖。")}>
+              <Button type="button" disabled={!selectedShot || !readiness.ready || isBusy} onClick={() => postImageAction({ action: "generate", shotIds: [selectedShot!.id], candidateCount }, "單張圖片已加入佇列並產生候選圖紀錄。")}>
                 <RefreshCcwIcon data-icon="inline-start" aria-hidden="true" />
                 生成 / 重新生成單張（加入佇列最後方）
               </Button>
@@ -265,7 +265,7 @@ export function ImageGenerationWorkbench({ projectId }: { projectId: string }) {
               <Button type="button" variant="outline" disabled={!selectedShotIds.length || isBusy} onClick={() => postImageAction({ action: "batch-approve-latest", shotIds: selectedShotIds }, "已批次標記各 shot 最新圖片版本為 approved。")}>
                 批次標記 approved
               </Button>
-              <Button type="button" variant="outline" disabled={!shots.length || isBusy} onClick={() => postImageAction({ action: "generate", allPending: true, candidateCount }, "全部 pending 圖片已批次 mock 生成。")}>
+              <Button type="button" variant="outline" disabled={!shots.length || isBusy} onClick={() => postImageAction({ action: "generate", allPending: true, candidateCount }, "全部待處理圖片已批次產生候選圖紀錄。")}>
                 批次生成全部 pending
               </Button>
               <Button type="button" variant="outline" disabled={!selectedShotIds.length || isBusy} onClick={() => postImageAction({ action: "delete-unapproved-versions", shotIds: selectedShotIds }, "已刪除選取 shots 的未核准圖片版本。")}>
@@ -365,7 +365,7 @@ export function ImageGenerationWorkbench({ projectId }: { projectId: string }) {
       <Card className="bg-card/80 backdrop-blur">
         <CardHeader>
           <CardTitle>Generation Queue</CardTitle>
-          <CardDescription>Mock worker 會立即完成，但仍保留 job 紀錄。</CardDescription>
+          <CardDescription>每次執行都會保留 API 紀錄與素材版本。</CardDescription>
         </CardHeader>
         <CardContent>
           <JobsTable jobs={jobs} />

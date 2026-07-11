@@ -247,7 +247,7 @@ export function SeoWorkbench({ projectId }: { projectId: string }) {
             <CardHeader>
               <CardTitle>SEO 分數</CardTitle>
               <CardDescription>
-                MVP mock score，會隨片段數與包裝完整度顯示。
+                分數會依片段數與包裝完整度估算。
               </CardDescription>
               <CardAction>{seoPackage ? <StatusBadge status={seoPackage.approved} /> : null}</CardAction>
             </CardHeader>

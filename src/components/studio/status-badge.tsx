@@ -11,9 +11,9 @@ const labels: Record<string, string> = {
   image_ready: "圖片完成",
   video_ready: "影片完成",
   completed: "已完成",
-  pending: "待處理",
-  queued: "佇列中",
-  running: "生成中",
+  pending: "等待中",
+  queued: "排隊中",
+  running: "執行中",
   success: "成功",
   failed: "失敗",
   cancelled: "已取消",
@@ -23,10 +23,10 @@ const labels: Record<string, string> = {
   generated: "已生成",
   uploaded: "已上傳",
   stale: "需更新",
-  prompt_outdated: "提示過期",
+  prompt_outdated: "提示詞需更新",
   exported: "已匯出",
-  true: "已核准",
-  false: "待確認",
+  true: "是",
+  false: "否",
 };
 
 function classFor(status: string) {

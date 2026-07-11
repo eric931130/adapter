@@ -1,13 +1,8 @@
 import type { ReactNode } from "react";
 
-import { readDb } from "@/lib/local-db";
-
-export const dynamicParams = false;
-
-export async function generateStaticParams() {
-  const db = await readDb();
-  return db.projects.map((project) => ({ projectId: project.id }));
-}
+// Projects are created at runtime and stored in Firestore, so project routes
+// must render on demand rather than being pre-generated at build time.
+export const dynamic = "force-dynamic";
 
 export default function ProjectLayout({ children }: { children: ReactNode }) {
   return children;
