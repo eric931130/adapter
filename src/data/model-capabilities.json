@@ -1,6 +1,27 @@
 {
   "textModels": [
     {
+      "id": "gpt-5.5",
+      "provider": "openai",
+      "name": "OpenAI GPT-5.5",
+      "supports": ["text_analysis", "segment_generation", "seo_packaging", "script_generation", "prompt_generation", "continuity_check", "transition_prompt", "log_summary"],
+      "costPerRun": 0
+    },
+    {
+      "id": "gemini-3.5-flash",
+      "provider": "google",
+      "name": "Google Gemini 3.5 Flash",
+      "supports": ["text_analysis", "segment_generation", "seo_packaging", "script_generation", "prompt_generation", "continuity_check", "transition_prompt", "log_summary"],
+      "costPerRun": 0
+    },
+    {
+      "id": "grok-4.3",
+      "provider": "xai",
+      "name": "xAI Grok 4.3",
+      "supports": ["text_analysis", "segment_generation", "seo_packaging", "script_generation", "prompt_generation", "continuity_check", "transition_prompt", "log_summary"],
+      "costPerRun": 0
+    },
+    {
       "id": "mock-story-analyzer-v1",
       "provider": "mock",
       "name": "Mock Story Analyzer",
@@ -17,7 +38,7 @@
   ],
   "imageModels": [
     {
-      "id": "openai_gpt_image_2",
+      "id": "gpt-image-2",
       "provider": "openai",
       "name": "GPT Image 2",
       "displayName": "OpenAI GPT Image 2",
@@ -34,11 +55,11 @@
       "maxOutputsPerPrompt": 4,
       "costPerImage": 0.08,
       "costEstimate": { "standard": 0.08, "high": 0.14 },
-      "fallbackModelIds": ["google_nano_banana_2", "local_mock_image"],
-      "notes": "Adapter placeholder for GPT Image 2."
+      "fallbackModelIds": ["gemini-3.1-flash-image", "local_mock_image"],
+      "notes": "Official OpenAI API model ID; provider adapter is not connected yet."
     },
     {
-      "id": "google_nano_banana_2",
+      "id": "gemini-3.1-flash-image",
       "provider": "google",
       "name": "Nano Banana 2",
       "displayName": "Google Nano Banana 2",
@@ -55,14 +76,14 @@
       "maxOutputsPerPrompt": 4,
       "costPerImage": 0.05,
       "costEstimate": { "standard": 0.05, "pro": 0.09 },
-      "fallbackModelIds": ["google_nano_banana_lite", "local_mock_image"],
-      "notes": "Mock capability entry for future Google image adapter."
+      "fallbackModelIds": ["gemini-3.1-flash-lite-image", "local_mock_image"],
+      "notes": "Official Gemini API model ID for Nano Banana 2; provider adapter is not connected yet."
     },
     {
-      "id": "google_nano_banana_lite",
+      "id": "gemini-3.1-flash-lite-image",
       "provider": "google",
-      "name": "Nano Banana Lite",
-      "displayName": "Google Nano Banana Lite",
+      "name": "Nano Banana 2 Lite",
+      "displayName": "Google Nano Banana 2 Lite",
       "type": "image",
       "modes": ["text-to-image", "image-edit"],
       "aspectRatios": ["9:16", "16:9"],
@@ -80,7 +101,7 @@
       "notes": "Fast draft image model profile."
     },
     {
-      "id": "google_nano_banana_pro",
+      "id": "gemini-3-pro-image",
       "provider": "google",
       "name": "Nano Banana Pro",
       "displayName": "Google Nano Banana Pro",
@@ -97,7 +118,7 @@
       "maxOutputsPerPrompt": 4,
       "costPerImage": 0.12,
       "costEstimate": { "high": 0.12, "ultra": 0.18 },
-      "fallbackModelIds": ["google_nano_banana_2", "local_comfyui_image", "local_mock_image"],
+      "fallbackModelIds": ["gemini-3.1-flash-image", "local_comfyui_image", "local_mock_image"],
       "notes": "High consistency image model profile."
     },
     {
@@ -187,7 +208,31 @@
   ],
   "videoModels": [
     {
-      "id": "google_veo_3_1_fast",
+      "id": "gemini-omni-flash-preview",
+      "provider": "google",
+      "name": "Gemini Omni Flash Preview",
+      "displayName": "Google Gemini Omni Flash（預覽版）",
+      "type": "video",
+      "modes": ["text-to-video", "image-to-video", "reference-to-video", "edit-video", "transition-video"],
+      "durations": { "min": 3, "max": 10 },
+      "aspectRatios": ["9:16", "16:9"],
+      "resolutions": ["720p"],
+      "fps": [24],
+      "outputFormats": ["mp4"],
+      "supportsAudio": true,
+      "supportsImageToVideo": true,
+      "supportsTextToVideo": true,
+      "supportsReferenceImages": true,
+      "supportsFirstLastFrame": false,
+      "supportsVideoExtension": false,
+      "supportsVideoEditing": true,
+      "maxInputImageSizeMB": 20,
+      "maxOutputsPerPrompt": 1,
+      "fallbackModelIds": ["veo-3.1-fast-generate-preview", "local_mock_video"],
+      "notes": "Google's current default video model in public preview; provider adapter is not connected yet."
+    },
+    {
+      "id": "veo-3.1-fast-generate-preview",
       "provider": "google",
       "name": "Veo 3.1 Fast",
       "displayName": "Google Veo 3.1 Fast",
@@ -213,7 +258,7 @@
       "notes": "Fast profile; durations and aspect ratios are read from this file."
     },
     {
-      "id": "google_veo_3_1",
+      "id": "veo-3.1-generate-preview",
       "provider": "google",
       "name": "Veo 3.1",
       "displayName": "Google Veo 3.1",
@@ -235,11 +280,11 @@
       "maxOutputsPerPrompt": 2,
       "costPerSecond": 0.24,
       "costEstimate": { "1080p": 0.24, "4k": 0.5 },
-      "fallbackModelIds": ["google_veo_3_1_fast", "local_comfyui_video", "local_mock_video"],
+      "fallbackModelIds": ["veo-3.1-fast-generate-preview", "local_comfyui_video", "local_mock_video"],
       "notes": "Full video model profile."
     },
     {
-      "id": "xai_grok_imagine_video",
+      "id": "grok-imagine-video",
       "provider": "xai",
       "name": "Grok Imagine Video",
       "displayName": "xAI Grok Imagine Video",
@@ -259,62 +304,36 @@
       "supportsVideoEditing": false,
       "maxInputImageSizeMB": 16,
       "maxOutputsPerPrompt": 1,
-      "costPerSecond": 0.1,
-      "costEstimate": { "720p": 0.1, "1080p": 0.14 },
+      "costPerSecond": 0.05,
+      "costEstimate": { "480p": 0.05, "720p": 0.07 },
       "fallbackModelIds": ["local_mock_video"],
       "notes": "Adapter should poll provider statuses: pending, done, expired, failed."
     },
     {
-      "id": "xai_grok_imagine_video_1_5",
+      "id": "grok-imagine-video-1.5",
       "provider": "xai",
       "name": "Grok Imagine Video 1.5",
       "displayName": "xAI Grok Imagine Video 1.5",
       "type": "video",
-      "modes": ["text-to-video", "image-to-video", "reference-to-video", "transition-video"],
-      "durations": [4, 6, 8],
+      "modes": ["image-to-video", "reference-to-video", "transition-video"],
+      "durations": [4, 6, 8, 10, 12],
       "aspectRatios": ["9:16", "16:9"],
       "resolutions": ["1080p"],
-      "fps": [24, 30],
+      "fps": [24],
       "outputFormats": ["mp4"],
       "supportsAudio": true,
       "supportsImageToVideo": true,
-      "supportsTextToVideo": true,
+      "supportsTextToVideo": false,
       "supportsReferenceImages": true,
       "supportsFirstLastFrame": false,
       "supportsVideoExtension": false,
       "supportsVideoEditing": false,
       "maxInputImageSizeMB": 20,
       "maxOutputsPerPrompt": 2,
-      "costPerSecond": 0.16,
-      "costEstimate": { "1080p": 0.16 },
-      "fallbackModelIds": ["xai_grok_imagine_video", "local_mock_video"],
+      "costPerSecond": 0.08,
+      "costEstimate": { "480p": 0.08, "720p": 0.14, "1080p": 0.25 },
+      "fallbackModelIds": ["grok-imagine-video", "local_mock_video"],
       "notes": "Adapter should map Grok statuses to internal job statuses."
-    },
-    {
-      "id": "openai_sora_2",
-      "provider": "openai",
-      "name": "Sora 2",
-      "displayName": "OpenAI Sora 2",
-      "type": "video",
-      "modes": ["text-to-video", "image-to-video", "reference-to-video", "first-last-frame", "extend-video", "edit-video", "transition-video"],
-      "durations": [4, 8, 12],
-      "aspectRatios": ["9:16", "16:9"],
-      "resolutions": ["720p", "1080p"],
-      "fps": [24, 30],
-      "outputFormats": ["mp4", "mov"],
-      "supportsAudio": true,
-      "supportsImageToVideo": true,
-      "supportsTextToVideo": true,
-      "supportsReferenceImages": true,
-      "supportsFirstLastFrame": true,
-      "supportsVideoExtension": true,
-      "supportsVideoEditing": true,
-      "maxInputImageSizeMB": 25,
-      "maxOutputsPerPrompt": 2,
-      "costPerSecond": 0.22,
-      "costEstimate": { "720p": 0.22, "1080p": 0.32 },
-      "fallbackModelIds": ["google_veo_3_1_fast", "local_mock_video"],
-      "notes": "Adapter placeholder for future Sora wiring."
     },
     {
       "id": "local_comfyui_video",

@@ -60,7 +60,7 @@ export function VideoGenerationWorkbench({ projectId }: { projectId: string }) {
   const [selectedAssetId, setSelectedAssetId] = useState("");
   const [renameValue, setRenameValue] = useState("");
   const [mode, setMode] = useState<VideoMode>("image-to-video");
-  const [modelId, setModelId] = useState("google_veo_3_1_fast");
+  const [modelId, setModelId] = useState("gemini-omni-flash-preview");
   const [duration, setDuration] = useState(4);
   const [resolution, setResolution] = useState("720p");
   const [fps, setFps] = useState(24);

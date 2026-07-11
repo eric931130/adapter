@@ -1,5 +1,5 @@
-import { ModelSettingsWorkbench } from "@/components/studio/advanced-workbenches";
+import { ApiProviderGuide } from "@/components/studio/api-provider-guide";
 
 export default function ModelSettingsPage() {
-  return <ModelSettingsWorkbench />;
+  return <ApiProviderGuide />;
 }
